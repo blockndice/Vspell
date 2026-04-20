@@ -1,0 +1,92 @@
+prototype 
+
+V0.00.01 = fondation html css js 
+v0.01.00 = Barre de vie Player
+v0.01.01 = ajout HUD Barre de vie Player
+v0.01.02 = ajustement bordure Barre de vie
+v0.02.00 = ajout ennemi duel
+v0.02.01 = ajout échange de dégat + stat attack / attackSpeed
+v0.02.02 = texte flottant des dégat reçue
+v0.02.03 = dégat sur l'adversaire lorsqu'on appuie sur Z où T
+v0.02.04 = dégat sur le joueur  lorsqu'on appuie sur X où V
+v0.03.00 = ajout sprite animation player 
+v0.03.01 = Sprite Attack + dégât en appuyant sur une touche
+v0.03.02 = ajout plusieurs dégât dans une sprite animation
+v0.03.03 = [HOTFIX] texte flottant rétablie comme en v0.02.02
+v0.03.04 = ajout sprite AA
+v0.03.05 = polish sprite AA
+v0.03.06 = polish systeme damage
+v0.03.07 = ajout timer AA
+v0.03.08 = ajout sprite Spell2
+v0.03.09 = ajout sprite Spell4
+v0.04.00 = Cancel AA
+v0.04.01 = Cancel AA polish
+v0.04.02 = [HOTFIX] Timer AA + vision timer AA
+v0.04.03 = Affichez le texte Cancel AA
+v0.04.04 = texte cancel AA remplacé par une croix
+v0.04.05 = HUD Timer AA repositionné
+v0.04.06 = HUD texte cancel AA repositionné 
+v0.05.00 = ajout icone spell
+v0.05.01 = cooldown sur les spell + feature spell déjà up
+v0.05.02 = Affiche l'image du spell si Up
+v0.05.03 = Affiche la touche d'activation lorsque le spell est Up
+v0.05.04 = [A REVOIR] Animation spell UP
+v0.05.05 = [HOTFIX] Animation spell UP
+v0.06.00 = Sprite Ennemy
+v0.06.01 = IA Ennemy AA
+v0.06.02 = IA Ennemy Spell
+v0.06.03 = [Polish] IA Ennemy Spell par cycle
+v0.06.04 = [HOTFIX] Texte flottant dégât vers le haut
+v0.07.00 = Transition Titre > Menu > Map > Combat
+v0.07.01 = [Polish] Transition Titre > Menu > Map > Combat
+v0.07.04 = Transition Titre < Menu < Map < Combat
+v0.08.00 = ajout clic les spells player
+v0.08.01 = [HOTFIX] position arène 2 sur map.js
+v0.09.00 = Décors de l'arène définit par monde sur map.js
+v0.10.00 = Project modulable -> character, arene + ajout choix du personnage
+v0.10.01 = play.js clean -> séparation du css et js dans chaque html
+v0.10.02 = miniature personnage renommé
+v0.10.03 = miniature image remplacé par animation sprite idle
+v0.11.00 = condition de victoire et défaite + retour carte où recommencé le combat
+v0.11.01 = option aventure et mission dans title page + clean project play.js -> arene.js
+v0.11.02 = clean project map.html -> map_arene.html
+v0.11.03 = clean project arene.html -> fight_arene.html
+v0.11.04 = select map mode mission 
+v0.11.05 = navigation foret1 mission + combat
+v0.11.06 = polish navigation + combat
+v0.12.00 = ennemi aléatoire en mission
+v0.12.01 = groupe ennemi + changer de cible en cliquant sur la barre de vie
+v0.12.02 = [polish positionnement des ennemis]
+v0.13.00 = ajout .png et .jpg sur lfs -> Large File Storage
+
+🎯 Feature visé
+Mode Mission : Plusieurs ennemi different lors d'un combat
+
+🚀 Option suivante 
+trouver des assets map
+mode arène : 1v1 -> palier comme une tour ivoire
+mode mission : team -> parcour une map avec des personnage, striker, item obtenu en mode aventure
+mode aventure : team -> parcour une map dévoilé pour débloqué les item et perso
+en team : barre de vie groupé en une seul, select les spell d'un perso, changer de perso reset les CD
+texte flottant à corriger en mode mission
+Mode de jeu Aventure, parcourir un niveau/monde pour gagner personnage, item
+mode mission : dans map_mission remplacé map monde par des affiches de prime
+clean et check les autre html
+inclure passif en spell
+map - dialogue - histoire + verse
+sécurité afk img
+spell bloc counter
+illustration character + show illustration on spell R
+
+inspiration : 
+Who Trained the Hero? -Spin of Fate- et He Is Coming
+
+-- Asset 
+https://merakintsugi.itch.io/platformer-character-pack
+https://tiopalada.itch.io/
+https://luizmelo.itch.io/
+https://xzany.itch.io/free-knight-2d-pixel-art
+https://ozzbit-games.itch.io/fantasy-character
+https://xzany.itch.io/kobold-warrior-2d-pixel-art
+https://xzany.itch.io/
+cloudinary.com

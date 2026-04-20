@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Arena — Forêt</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@700&family=Crimson+Text:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="asset/css/map_arene.css">
+    <style>
+        #combat-overlay {
+            display: none;
+            position: fixed; inset: 0;
+            z-index: 100;
+            background: rgba(0,0,0,0.82);
+            align-items: center; justify-content: center;
+            flex-direction: column;
+        }
+        #combat-overlay.active { display: flex; }
+
+        .overlay-eyebrow {
+            font-family: 'Crimson Text', serif;
+            font-style: italic; font-size: 13px; letter-spacing: 5px;
+            color: #c9a84c; text-transform: uppercase;
+            margin-bottom: 8px;
+            animation: fadeDown 0.4s ease forwards;
+        }
+        .overlay-title {
+            font-family: 'Cinzel Decorative', serif;
+            font-size: clamp(28px, 5vw, 52px);
+            color: #e74c3c;
+            text-shadow: 0 0 40px rgba(231,76,60,0.6);
+            margin-bottom: 6px;
+            animation: fadeDown 0.45s ease forwards;
+        }
+        .overlay-sub {
+            font-family: 'Crimson Text', serif;
+            font-size: 16px; color: rgba(255,255,255,0.4);
+            letter-spacing: 3px; text-transform: uppercase;
+            margin-bottom: 24px;
+            animation: fadeDown 0.5s ease forwards;
+        }
+        .overlay-divider {
+            width: 160px; height: 1px;
+            background: linear-gradient(90deg, transparent, #e74c3c, transparent);
+            margin: 0 auto 24px;
+        }
+        .overlay-countdown {
+            font-family: 'Crimson Text', serif;
+            font-size: 15px; letter-spacing: 3px;
+            color: rgba(255,255,255,0.35); text-transform: uppercase;
+            animation: fadeUp 0.5s ease forwards;
+        }
+        .overlay-countdown span { color: #f0c040; font-weight: bold; }
+
+        #encounter-timer {
+            position: fixed; bottom: 20px; right: 20px; z-index: 50;
+            font-family: 'Crimson Text', serif;
+            font-size: 12px; letter-spacing: 2px; text-transform: uppercase;
+            color: rgba(255,255,255,0.25); pointer-events: none;
+        }
+        #encounter-timer span { color: #e74c3c; font-weight: bold; }
+
+        @keyframes fadeUp   { from { opacity:0; transform:translateY(16px); } to { opacity:1; transform:translateY(0); } }
+        @keyframes fadeDown { from { opacity:0; transform:translateY(-10px); } to { opacity:1; transform:translateY(0); } }
+    </style>
+</head>
+<body>
+    <div class="bg"></div>
+    <div class="bg-lines"></div>
+
+    <header>
+        <a href="map_mission.html" class="nav-back" id="btn-back">
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+                <path d="M10 3L5 8l5 5"/>
+            </svg>
+            Abandon
+        </a>
+        <div class="header-title">
+            Mission
+            <small id="mission-label">Exploration</small>
+        </div>
+        <div class="header-right"></div>
+    </header>
+
+    <div class="canvas-wrap">
+        <canvas id="mapCanvas"></canvas>
+    </div>
+
+    <div id="encounter-timer">Prochain combat : <span id="timer-val">5</span>s</div>
+
+    <div id="combat-overlay">
+        <p class="overlay-eyebrow">Rencontre ennemie</p>
+        <h2 class="overlay-title">⚔ Combat !</h2>
+        <p class="overlay-sub">Un ennemi se dresse devant vous</p>
+        <div class="overlay-divider"></div>
+        <p class="overlay-countdown">Combat dans <span id="overlay-count">1</span>s…</p>
+    </div>
+
+    <script src="asset/js/characters/swordsman.js"></script>
+    <script src="asset/js/characters/skeleton.js"></script>
+    <script src="asset/js/characters/skeleton_archer.js"></script>
+    <script src="asset/js/map_data.js"></script>
+    <script src="asset/js/roundForet.js"></script>
+</body>
+</html>

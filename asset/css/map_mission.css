@@ -1,0 +1,98 @@
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+:root {
+    --gold:    #c9a84c;
+    --gold-lt: #f0c040;
+    --red:     #e74c3c;
+    --bg:      #080808;
+}
+
+html, body {
+    width: 100%; height: 100%;
+    background: var(--bg);
+    overflow: hidden;
+    font-family: 'Crimson Text', Georgia, serif;
+    color: #ddd;
+}
+
+/* ── Fond ── */
+.bg {
+    position: fixed; inset: 0;
+    background:
+        radial-gradient(ellipse 80% 60% at 50% 110%, #2a0808 0%, transparent 65%),
+        #080808;
+}
+.bg-lines {
+    position: fixed; inset: 0; pointer-events: none;
+    background: repeating-linear-gradient(
+        -55deg, transparent, transparent 80px,
+        rgba(201,168,76,0.015) 80px, rgba(201,168,76,0.015) 81px
+    );
+}
+
+/* ── Header ── */
+header {
+    position: fixed; top: 0; left: 0; right: 0;
+    z-index: 30;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 24px;
+    background: linear-gradient(to bottom, rgba(0,0,0,0.85), transparent);
+    pointer-events: none;
+}
+
+.nav-back {
+    pointer-events: auto;
+    display: flex; align-items: center; gap: 8px;
+    font-family: 'Crimson Text', serif;
+    font-size: 14px; letter-spacing: 2px;
+    text-transform: uppercase; text-decoration: none;
+    color: rgba(201,168,76,0.7);
+    transition: color 0.2s;
+}
+.nav-back:hover { color: var(--gold-lt); }
+.nav-back svg { width: 16px; height: 16px; }
+
+.header-title {
+    font-family: 'Cinzel Decorative', serif;
+    font-size: clamp(13px, 1.8vw, 18px);
+    color: var(--gold);
+    letter-spacing: 2px;
+    text-align: center;
+}
+.header-title small {
+    display: block;
+    font-family: 'Crimson Text', serif;
+    font-size: 11px;
+    letter-spacing: 4px;
+    color: rgba(255,255,255,0.3);
+    text-transform: uppercase;
+    margin-top: 2px;
+}
+
+.header-right { width: 120px; } /* équilibre le flex */
+
+/* ── Zone canvas ── */
+.canvas-wrap {
+    position: relative; z-index: 10;
+    width: 100%; height: 100%;
+    display: flex; align-items: center; justify-content: center;
+}
+
+canvas {
+    display: block;
+    border: 1px solid rgba(201,168,76,0.2);
+    box-shadow:
+        0 0 0 1px rgba(0,0,0,0.8),
+        0 0 60px rgba(139,26,26,0.3),
+        0 0 120px rgba(0,0,0,0.6);
+    image-rendering: pixelated;
+}
+
+/* Vignette autour du canvas */
+.canvas-wrap::after {
+    content: '';
+    position: fixed; inset: 0;
+    background: radial-gradient(ellipse 90% 90% at 50% 50%, transparent 55%, rgba(0,0,0,0.7) 100%);
+    pointer-events: none;
+    z-index: 20;
+}
