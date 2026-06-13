@@ -1,0 +1,32 @@
+/* Canvas plein écran — la caméra scrolle selon la position du héros */
+#mapCanvas {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100vw !important;
+    height: 100vh !important;
+    display: block;
+    border: none;
+    box-shadow: none;
+}
+
+.controls-hint {
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 40;
+    font-family: 'Crimson Text', serif;
+    font-size: 13px;
+    letter-spacing: 1px;
+    color: rgba(255, 255, 255, 0.3);
+    white-space: nowrap;
+}
+
+.kbd {
+    display: inline-block;
+    padding: 1px 6px;
+    border: 1px solid rgba(201, 168, 76, 0.35);
+    border-radius: 3px;
+    color: rgba(201, 168, 76, 0.65);
+    font-size: 12px;
+}

@@ -59,6 +59,7 @@ v0.12.01 = groupe ennemi + changer de cible en cliquant sur la barre de vie
 v0.12.02 = [polish positionnement des ennemis]
 v0.13.00 = ajout .png et .jpg sur lfs -> Large File Storage
 v0.13.01 = start mode aventure
+v0.13.02 = ajout donjon + déplacement personnage
 
 🎯 Feature visé
 Mode Mission : Plusieurs ennemi different lors d'un combat

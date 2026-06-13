@@ -43,6 +43,12 @@ const SWORDSMAN = {
             width: 48, height: 32, offsetX: 0, offsetY: 0,
             frameTime: 0.12, loop: true,
         },
+        walk: {
+            path: "asset/img/Swordsman/Walk/Walk_Swordsman{i}.png",
+            count: 8,
+            width: 48, height: 32, offsetX: 0, offsetY: 0,
+            frameTime: 0.1, loop: true,
+        },
         AA: {
             path: "asset/img/Swordsman/AA/AA_Swordsman{i}.png",
             count: 7,

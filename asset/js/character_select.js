@@ -2,23 +2,28 @@ const params      = new URLSearchParams(window.location.search);
 const arenaId     = Number(params.get("arena")) || 1;
 const fromMap     = params.get("from") || "map_arene"; // page d'origine
 
+const isAventure1 = fromMap === "aventure1";
+
 // Cherche dans la bonne config selon le mode
-const arenaConfig = fromMap === "map_mission"
-    ? MISSION_CONFIG[arenaId]
-    : fromMap === "map_aventure"
-        ? AVENTURE_CONFIG[arenaId]
-        : ARENAS_CONFIG[arenaId];
+const arenaConfig = isAventure1
+    ? null
+    : fromMap === "map_mission"
+        ? MISSION_CONFIG[arenaId]
+        : fromMap === "map_aventure"
+            ? AVENTURE_CONFIG[arenaId]
+            : ARENAS_CONFIG[arenaId];
 
 // Texte du bouton selon le mode
 const btnFight = document.getElementById("btn-fight");
 if (fromMap === "map_mission") {
     btnFight.innerHTML = "⚔ &nbsp;Commencer la mission";
-} else if (fromMap === "map_aventure") {
+} else if (fromMap === "map_aventure" || isAventure1) {
     btnFight.innerHTML = "⚔ &nbsp;Commencer l'aventure";
 }
 
-document.getElementById("arena-label").textContent =
-    arenaConfig
+document.getElementById("arena-label").textContent = isAventure1
+    ? "Mode Aventure"
+    : arenaConfig
         ? (fromMap === "map_aventure"
             ? `Étape ${arenaId} — ${arenaConfig.name}`
             : `Arène ${arenaId} — ${arenaConfig.name}`)
@@ -119,7 +124,12 @@ for (const [charId, getChar] of Object.entries(CHARACTERS_REGISTRY)) {
 }
 
 btnFight.addEventListener("click", () => {
-    if (!selectedCharId || !arenaConfig) return;
+    if (!selectedCharId) return;
+    if (isAventure1) {
+        window.location.href = `aventure1.html?player=${selectedCharId}`;
+        return;
+    }
+    if (!arenaConfig) return;
     if (fromMap === "map_mission") {
         window.location.href =
             `roundForet.html?arena=${arenaId}&player=${selectedCharId}&bg=${arenaConfig.bg}&from=${fromMap}`;
@@ -130,5 +140,5 @@ btnFight.addEventListener("click", () => {
 });
 
 document.getElementById("btn-back").addEventListener("click", () => {
-    window.location.href = `${fromMap}.html`;
+    window.location.href = isAventure1 ? "index.html" : `${fromMap}.html`;
 });
