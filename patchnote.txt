@@ -58,9 +58,10 @@ v0.12.00 = ennemi aléatoire en mission
 v0.12.01 = groupe ennemi + changer de cible en cliquant sur la barre de vie
 v0.12.02 = [polish positionnement des ennemis]
 v0.13.00 = ajout .png et .jpg sur lfs -> Large File Storage
-v0.13.01 = start mode aventure
-v0.13.02 = ajout donjon + déplacement personnage
-v0.13.03 = ajout item + combat aléatoire
+v0.14.00 = start mode aventure
+v0.14.01 = ajout donjon + déplacement personnage
+v0.14.02 = ajout item + combat aléatoire
+v0.14.03 = ajout fight_aventure1.html + ennemis sur la map aventure
 
 🎯 Feature visé
 Mode Mission : Plusieurs ennemi different lors d'un combat

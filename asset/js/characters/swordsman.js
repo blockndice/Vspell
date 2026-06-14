@@ -15,7 +15,7 @@ const SWORDSMAN = {
     // STATS
     // --------------------------------
     maxHp:   1000,
-    aaSpeed: 2,       // secondes entre chaque auto-attaque
+    aaSpeed: 1.25,       // secondes entre chaque auto-attaque
 
     // --------------------------------
     // SPRITES

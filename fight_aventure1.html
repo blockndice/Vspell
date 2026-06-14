@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aventure — Combat</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@700&family=Crimson+Text:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="asset/css/fight_mission.css">
+</head>
+<body>
+
+    <div class="bg"></div>
+
+    <!-- Bandeau arène (discret, au-dessus du canvas) -->
+    <div class="arena-banner" id="arena-banner">Combat</div>
+
+    <div class="canvas-wrap">
+        <canvas id="gameCanvas"></canvas>
+    </div>
+
+    <div class="vignette"></div>
+
+    <div class="back-overlay">
+        <a href="aventure1.html" class="btn-back" id="btn-back">
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+                <path d="M10 3L5 8l5 5"/>
+            </svg>
+            Abondon
+        </a>
+    </div>
+
+    <!-- Config partagée — DOIT être chargée avant fight_aventure1.js -->
+    <script src="asset/js/characters/swordsman.js"></script>
+    <script src="asset/js/characters/skeleton.js"></script>
+    <script src="asset/js/characters/skeleton_archer.js"></script>
+    <script src="asset/js/map_data.js"></script>
+    <!-- Logique de combat -->
+    <script src="asset/js/fight_aventure1.js"></script>
+
+</body>
+</html>

@@ -26,6 +26,12 @@ const SKELETON = {
             width: 48, height: 32, offsetX: 0, offsetY: 0,
             frameTime: 0.12, loop: true,
         },
+        walk: {
+            path: "asset/img/Skeleton/Walk/Walk_Skeleton{i}.png",
+            count: 8,
+            width: 48, height: 32, offsetX: 0, offsetY: 0,
+            frameTime: 0.1, loop: true,
+        },
         AA: {
             path: "asset/img/Skeleton/AA/AA_Skeleton{i}.png",
             count: 6,

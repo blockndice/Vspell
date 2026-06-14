@@ -79,13 +79,38 @@ const ITEM_GRID = (function () {
     return g;
 })();
 
+// ── Grille d'ennemis (même dimensions que MAP_GRID) ─────────
+// 0 = vide  |  1 = skeleton  |  2 = skeleton_archer
+// Pour placer un ennemi : ENNEMI_GRID[LIGNE][COLONNE] = 1 ou 2
+const ENNEMI_GRID = (function () {
+    const g = Array.from({ length: ROWS }, () => new Array(COLS).fill(0));
+    // ── Ennemis ───────────────────────────────────────────────
+    g[5][10] = 1;  // → skeleton en ligne 5, colonne 10
+    g[8][20] = 2;  // → skeleton_archer en ligne 8, colonne 20
+    // ─────────────────────────────────────────────────────────
+    return g;
+})();
+
+// Patrouilles optionnelles — clé = "LIGNE,COLONNE" (position de spawn dans ENNEMI_GRID).
+// Si la clé est absente l'ennemi est immobile (move = false).
+// points : liste de [LIGNE, COLONNE] que l'ennemi parcourt en aller-retour.
+const ENNEMI_PATROL = {
+    // "5,10": { points: [[5,10],[5,18]] },        // → aller-retour col 10 ↔ 18
+    "8,20": { points: [[8,20],[14,20],[14,28]] }, // → 3 waypoints en L
+};
+
 // ── Mouvement ────────────────────────────────────────────────
 const HERO_SPEED    = 120;  // vitesse max en pixels/seconde
 const HERO_ACCEL    = 700;  // accélération (px/s²) — plus élevé = réponse plus rapide
 const HERO_FRICTION = 14;   // décélération au relâchement — plus élevé = arrêt plus brusque
 const HERO_SCALE    = 1.5;  // taille du sprite : 1 = une case, 2 = deux cases, 0.5 = demi-case
+const ENEMY_SCALE   = 1.75;  // taille des sprites ennemis — même référence que HERO_SCALE
 const HERO_ANIM_SLOW = 1.75;  // ralentissement de l'animation idle : 1 = normal, 2 = moitié vitesse, 3 = tiers
 const HERO_WALK_SPEED = 1.5;    // vitesse de l'animation marche : 1 = normal, 2 = double vitesse, 0.5 = moitié
+
+const ENEMY_SPEED    = 50;   // vitesse max de patrouille en pixels/seconde
+const ENEMY_ACCEL    = 180;  // accélération (px/s²)
+const ENEMY_FRICTION = 10;   // décélération à l'arrêt (coefficient exponentiel)
 
 // Rayon de collision du héros (en pixels). Réduire pour passer dans des passages plus étroits.
 const HERO_RADIUS = TILE_SIZE * 0.32;
@@ -100,6 +125,9 @@ const ENCOUNTER_ENEMIES = ["skeleton", "skeleton_archer"]; // ennemis possibles
 
 // Mettre à true pour activer les combats aléatoires.
 let fight = false;
+
+// Nombre d'ennemis par rencontre (1 à 4). Si 0, le nombre est aléatoire entre 1 et 4.
+const ENCOUNTER_COUNT = 1;
 
 (function () {
     const params   = new URLSearchParams(window.location.search);
@@ -141,23 +169,25 @@ let fight = false;
     });
     document.body.appendChild(encOverlay);
 
-    function triggerEncounter() {
+    function triggerEncounter(forcedEnemy) {
         combatActive = true;
+        encounterTimer = ENCOUNTER_MIN + Math.random() * (ENCOUNTER_MAX - ENCOUNTER_MIN);
         encOverlay.style.display = "flex";
         let count = 1;
         document.getElementById("enc-count").textContent = count;
         const iv = setInterval(() => {
             count--;
             document.getElementById("enc-count").textContent = Math.max(0, count);
-            if (count <= 0) { clearInterval(iv); goFight(); }
+            if (count <= 0) { clearInterval(iv); goFight(forcedEnemy); }
         }, 1000);
     }
 
-    function goFight() {
-        const enemy = ENCOUNTER_ENEMIES[Math.floor(Math.random() * ENCOUNTER_ENEMIES.length)];
+    function goFight(forcedEnemy) {
+        const enemy = forcedEnemy || ENCOUNTER_ENEMIES[Math.floor(Math.random() * ENCOUNTER_ENEMIES.length)];
+        const count = ENCOUNTER_COUNT > 0 ? ENCOUNTER_COUNT : Math.floor(Math.random() * 4) + 1;
         window.location.href =
-            `fight_mission.html?arena=1&player=${playerId}&bg=foret1.png&enemy=${enemy}` +
-            `&from=aventure1&mapW=${MAP_W}&mapH=${MAP_H}` +
+            `fight_aventure1.html?arena=1&player=${playerId}&bg=arene.jpg&enemy=${enemy}` +
+            `&count=${count}&from=aventure1&mapW=${MAP_W}&mapH=${MAP_H}` +
             `&px=${Math.round(hero.x)}&py=${Math.round(hero.y)}`;
     }
 
@@ -177,6 +207,64 @@ let fight = false;
         // animation walk
         walkFrames: [], walkFrameIdx: 0, walkElapsed: 0, walkFrameTime: 0.1,
     };
+
+    // ── Initialisation des ennemis depuis ENNEMI_GRID ────────────
+    const enemies = [];
+    for (let r = 0; r < ROWS; r++) {
+        for (let c = 0; c < COLS; c++) {
+            const type = ENNEMI_GRID[r][c];
+            if (!type) continue;
+            const config = ENNEMI_PATROL[`${r},${c}`];
+            enemies.push({
+                type: type === 1 ? "skeleton" : "skeleton_archer",
+                x: (c + 0.5) * TILE_SIZE,
+                y: (r + 0.5) * TILE_SIZE,
+                move: !!config,
+                patrolPoints: config
+                    ? config.points.map(([pr, pc]) => ({ x: (pc + 0.5) * TILE_SIZE, y: (pr + 0.5) * TILE_SIZE }))
+                    : [],
+                patrolIdx: 0,
+                patrolDir: 1,  // 1 = vers l'avant, -1 = vers l'arrière
+                vx: 0, vy: 0,
+                facing: 1,
+                facingTimer: 0,
+                isMoving: false,
+                frameIdx: 0,
+                elapsed: 0,
+                walkFrameIdx: 0,
+                walkElapsed: 0,
+            });
+        }
+    }
+
+    // ── Cache de sprites ennemis (partagé par type) ──────────────
+    const SPRITE_CACHE = {};
+    function loadEnemySprites() {
+        const types = [...new Set(enemies.map(e => e.type))];
+        for (const type of types) {
+            const charFn = CHARACTERS_REGISTRY?.[type];
+            if (!charFn) continue;
+            const sprites = charFn().sprites ?? {};
+            const cache = {};
+            for (const key of ["idle", "walk"]) {
+                const def = sprites[key];
+                if (!def?.path || !def.count) continue;
+                const entry = {
+                    frames: new Array(def.count).fill(null),
+                    spriteW: def.width,
+                    spriteH: def.height,
+                    frameTime: def.frameTime ?? 0.1,
+                };
+                for (let i = 0; i < def.count; i++) {
+                    const img = new Image(), idx = i;
+                    img.onload = () => { entry.frames[idx] = img; };
+                    img.src = def.path.replace("{i}", i + 1);
+                }
+                cache[key] = entry;
+            }
+            SPRITE_CACHE[type] = cache;
+        }
+    }
 
     // ── Chargement des sprites du héros ──────────────────────────
     function loadHeroSprites() {
@@ -340,6 +428,62 @@ let fight = false;
 
     }
 
+    // ── Mise à jour des ennemis (patrouille) ─────────────────────
+    const ENEMY_FLIP_INTERVAL = 3; // secondes entre chaque changement de sens (ennemis immobiles)
+
+    function updateEnemies(dt) {
+        for (const e of enemies) {
+            if (!e.move || e.patrolPoints.length < 2) {
+                // Immobile : retournement périodique
+                e.facingTimer += dt;
+                if (e.facingTimer >= ENEMY_FLIP_INTERVAL) {
+                    e.facingTimer = 0;
+                    e.facing *= -1;
+                }
+                e.isMoving = false;
+                continue;
+            }
+            const target = e.patrolPoints[e.patrolIdx];
+            const dx = target.x - e.x;
+            const dy = target.y - e.y;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            if (dist < TILE_SIZE * 0.3) {
+                // Waypoint atteint : friction pour freiner, puis passer au suivant
+                const decay = Math.exp(-ENEMY_FRICTION * dt);
+                e.vx *= decay;
+                e.vy *= decay;
+                if (Math.abs(e.vx) < 0.5 && Math.abs(e.vy) < 0.5) {
+                    e.vx = 0; e.vy = 0;
+                    const next = e.patrolIdx + e.patrolDir;
+                    if (next < 0 || next >= e.patrolPoints.length) {
+                        e.patrolDir *= -1;
+                        e.patrolIdx += e.patrolDir;
+                        e.facing *= -1; // demi-tour : inverse le sens
+                    } else {
+                        e.patrolIdx = next;
+                        // Met à jour le sens selon la prochaine direction
+                        const np = e.patrolPoints[e.patrolIdx];
+                        const ndx = np.x - e.x;
+                        if (Math.abs(ndx) > 1) e.facing = ndx > 0 ? 1 : -1;
+                        else e.facing *= -1;
+                    }
+                }
+                e.isMoving = Math.abs(e.vx) > 0.5 || Math.abs(e.vy) > 0.5;
+            } else {
+                // En route : accélération vers la cible, plafond à ENEMY_SPEED
+                const ix = dx / dist, iy = dy / dist;
+                e.vx += ix * ENEMY_ACCEL * dt;
+                e.vy += iy * ENEMY_ACCEL * dt;
+                const speed = Math.sqrt(e.vx * e.vx + e.vy * e.vy);
+                if (speed > ENEMY_SPEED) { e.vx *= ENEMY_SPEED / speed; e.vy *= ENEMY_SPEED / speed; }
+                e.isMoving = true;
+                if (Math.abs(dx) > 1) e.facing = dx > 0 ? 1 : -1;
+            }
+            e.x += e.vx * dt;
+            e.y += e.vy * dt;
+        }
+    }
+
     // ── Rendu de la grille ────────────────────────────────────────
     function drawGrid() {
         for (let r = 0; r < ROWS; r++) {
@@ -433,6 +577,68 @@ let fight = false;
         }
     }
 
+    // ── Rendu des ennemis (sprite animé, fallback cercle) ────────
+    function drawEnemies(dt) {
+        const refW = hero.spriteW || TILE_SIZE;
+        const refH = hero.spriteH || TILE_SIZE;
+        const s = Math.min(TILE_SIZE / refW, TILE_SIZE / refH) * ENEMY_SCALE;
+
+        for (const e of enemies) {
+            const typeCache = SPRITE_CACHE[e.type];
+            const anim = typeCache && (e.isMoving && typeCache.walk ? typeCache.walk : typeCache.idle);
+
+            if (anim) {
+                const loaded = anim.frames.filter(Boolean);
+                if (loaded.length > 0) {
+                    if (e.isMoving) {
+                        e.walkElapsed += dt;
+                        if (e.walkElapsed >= anim.frameTime) {
+                            e.walkElapsed -= anim.frameTime;
+                            e.walkFrameIdx = (e.walkFrameIdx + 1) % loaded.length;
+                        }
+                    } else {
+                        e.elapsed += dt;
+                        if (e.elapsed >= anim.frameTime) {
+                            e.elapsed -= anim.frameTime;
+                            e.frameIdx = (e.frameIdx + 1) % loaded.length;
+                        }
+                    }
+                    const idx = e.isMoving ? e.walkFrameIdx : e.frameIdx;
+                    const img = loaded[Math.min(idx, loaded.length - 1)];
+                    ctx.save();
+                    ctx.translate(e.x, e.y);
+                    ctx.scale(e.facing, 1);
+                    const idleW = (typeCache.idle?.spriteW ?? anim.spriteW) * s;
+                    const idleH = (typeCache.idle?.spriteH ?? anim.spriteH) * s;
+                    ctx.drawImage(img, -idleW / 2, -idleH / 2, idleW, idleH);
+                    ctx.restore();
+                    continue;
+                }
+            }
+            // Fallback : cercle coloré si les sprites ne sont pas encore chargés
+            ctx.beginPath();
+            ctx.arc(e.x, e.y, TILE_SIZE * 0.3, 0, Math.PI * 2);
+            ctx.fillStyle = e.type === "skeleton" ? "#e55555" : "#e09020";
+            ctx.fill();
+            ctx.strokeStyle = "rgba(0,0,0,0.6)";
+            ctx.lineWidth = 1.5;
+            ctx.stroke();
+        }
+    }
+
+    // ── Collision héros ↔ ennemi → déclenche le combat ──────────
+    function checkEnemyCollision() {
+        const contactDist = HERO_RADIUS * 2;
+        for (const e of enemies) {
+            const dx = hero.x - e.x;
+            const dy = hero.y - e.y;
+            if (dx * dx + dy * dy < contactDist * contactDist) {
+                triggerEncounter(e.type);
+                return;
+            }
+        }
+    }
+
     // ── Boucle de jeu ────────────────────────────────────────────
     let lastTS = null;
     function loop(ts) {
@@ -441,6 +647,8 @@ let fight = false;
 
         if (!combatActive) {
             updateHero(dt);
+            updateEnemies(dt);
+            checkEnemyCollision();
             if (fight) {
                 encounterTimer -= dt;
                 if (encounterTimer <= 0) triggerEncounter();
@@ -458,6 +666,7 @@ let fight = false;
         // Applique zoom + décalage caméra en une seule transformation
         ctx.setTransform(scale, 0, 0, scale, -camX * scale, -camY * scale);
         drawGrid();
+        drawEnemies(dt);
         drawTarget();
         drawHero(dt);
         requestAnimationFrame(loop);
@@ -514,5 +723,6 @@ let fight = false;
     });
 
     loadHeroSprites();
+    loadEnemySprites();
     requestAnimationFrame(loop);
 })();

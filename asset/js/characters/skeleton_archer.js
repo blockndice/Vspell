@@ -23,13 +23,19 @@ const SKELETON_ARCHER = {
         idle: {
             path: "asset/img/Skeleton_Archer/Idle/Idle_Skeleton_Archer{i}.png",
             count: 6,
-            width: 48, height: 48, offsetX: 0, offsetY: 0,
+            width: 48, height: 32, offsetX: 0, offsetY: 0,
             frameTime: 0.12, loop: true,
+        },
+        walk: {
+            path: "asset/img/Skeleton_Archer/Walk/Walk_Skeleton_Archer{i}.png",
+            count: 8,
+            width: 48, height: 32, offsetX: 0, offsetY: 0,
+            frameTime: 0.1, loop: true,
         },
         AA: {
             path: "asset/img/Skeleton_Archer/AA/AA_Skeleton_Archer{i}.png",
             count: 9,
-            width: 48, height: 48, offsetX: 0, offsetY: 0,
+            width: 48, height: 32, offsetX: 0, offsetY: 0,
             frameTime: 0.08, loop: false,
             damageFrames: [7], damageHit: [30],
         },
