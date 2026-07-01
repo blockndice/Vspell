@@ -110,7 +110,165 @@ const btnBack = document.getElementById("btn-back");
 if (btnBack) btnBack.href = "aventure1.html";
 
 // ================================
-// ASSETS — FOND
+// DÉCOR 3D EN ARRIÈRE-PLAN
+// ================================
+(function initArena3D() {
+    if (typeof THREE === "undefined") return;
+
+    // Canvas 3D fixe derrière le jeu
+    const bg = document.createElement("canvas");
+    Object.assign(bg.style, {
+        position: "fixed", top: "0", left: "0",
+        width: "100%", height: "100%",
+        zIndex: "5", pointerEvents: "none",
+        boxShadow: "none",
+    });
+    document.body.insertBefore(bg, document.body.firstChild);
+
+    const bgR = new THREE.WebGLRenderer({ canvas: bg, antialias: false });
+    bgR.setPixelRatio(1);
+    bgR.shadowMap.enabled = true;
+    bgR.shadowMap.type = THREE.BasicShadowMap;
+
+    const bgS = new THREE.Scene();
+    bgS.background = new THREE.Color(0x08060e);
+    bgS.fog = new THREE.Fog(0x08060e, 10, 28);
+
+    const bgCam = new THREE.PerspectiveCamera(65, 1, 0.1, 60);
+    bgCam.position.set(0, 3.5, 9);
+    bgCam.lookAt(0, 1, -5);
+
+    function onBgResize() {
+        bgR.setSize(window.innerWidth, window.innerHeight);
+        bgCam.aspect = window.innerWidth / window.innerHeight;
+        bgCam.updateProjectionMatrix();
+    }
+    window.addEventListener("resize", onBgResize);
+    onBgResize();
+
+    // ── Lumières ─────────────────────────────────────────────────
+    bgS.add(new THREE.AmbientLight(0x201030, 2.5));
+
+    const moonLight = new THREE.DirectionalLight(0x4030a0, 1.2);
+    moonLight.position.set(-4, 12, 5);
+    moonLight.castShadow = true;
+    moonLight.shadow.mapSize.set(512, 512);
+    bgS.add(moonLight);
+
+    // Torches (ajoutées après les piliers)
+    const torchL = new THREE.PointLight(0xff5010, 0, 10);
+    torchL.position.set(-5.5, 4.5, -3);
+    bgS.add(torchL);
+    const torchR = new THREE.PointLight(0xff5010, 0, 10);
+    torchR.position.set( 5.5, 4.5, -3);
+    bgS.add(torchR);
+
+    // ── Textures pixel-art ────────────────────────────────────────
+    function pixelTex(fn, size) {
+        size = size || 16;
+        const c = document.createElement("canvas");
+        c.width = c.height = size;
+        const cx = c.getContext("2d");
+        function px(x, y, col) { cx.fillStyle = col; cx.fillRect(x, y, 1, 1); }
+        fn(cx, px);
+        const t = new THREE.CanvasTexture(c);
+        t.magFilter = THREE.NearestFilter;
+        t.minFilter = THREE.NearestFilter;
+        return t;
+    }
+
+    const texFloor = pixelTex(function (cx, px) {
+        for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) {
+            const v = ((x*7+y*5)%11 < 2) ? "#4e3e2e"
+                    : ((x*3+y*9)%7  < 1) ? "#5e4e3c"
+                    : "#665644";
+            px(x, y, v);
+        }
+        for (let xi = 0; xi < 16; xi++) { px(xi, 0, "#38302a"); px(0, xi, "#38302a"); }
+        [[3,1],[8,5],[12,2],[2,10]].forEach(b => px(b[0], b[1], "#48402e"));
+    });
+    texFloor.repeat.set(6, 6);
+    texFloor.wrapS = texFloor.wrapT = THREE.RepeatWrapping;
+
+    const texWall = pixelTex(function (cx, px) {
+        for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) {
+            const dark = (y % 5 === 0 || (x + Math.floor(y / 5) * 7) % 8 === 0);
+            px(x, y, dark ? "#0e0c16" : ((x+y) % 3 === 0 ? "#221e32" : "#1c1a28"));
+        }
+    });
+    texWall.repeat.set(6, 2.5);
+    texWall.wrapS = texWall.wrapT = THREE.RepeatWrapping;
+
+    const texPillar = pixelTex(function (cx, px) {
+        for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) {
+            px(x, y, (x === 0 || x === 15 || y === 0 || y === 15) ? "#14121e" : "#24203a");
+        }
+    });
+
+    const matFloor  = new THREE.MeshLambertMaterial({ map: texFloor });
+    const matWall   = new THREE.MeshLambertMaterial({ map: texWall });
+    const matPillar = new THREE.MeshLambertMaterial({ map: texPillar });
+    const matCap    = new THREE.MeshLambertMaterial({ color: 0x1a1830 });
+
+    // ── Géométries ───────────────────────────────────────────────
+    // Sol
+    const floor = new THREE.Mesh(new THREE.PlaneGeometry(28, 22), matFloor);
+    floor.rotation.x = -Math.PI / 2;
+    floor.position.set(0, 0, -2);
+    floor.receiveShadow = true;
+    bgS.add(floor);
+
+    // Mur du fond
+    const backWall = new THREE.Mesh(new THREE.BoxGeometry(28, 10, 0.6), matWall);
+    backWall.position.set(0, 5, -13);
+    backWall.receiveShadow = true;
+    bgS.add(backWall);
+
+    // Murs latéraux
+    const sideGeo = new THREE.BoxGeometry(0.6, 10, 22);
+    const wallL2 = new THREE.Mesh(sideGeo, matWall);
+    wallL2.position.set(-10, 5, -3);
+    bgS.add(wallL2);
+    const wallR2 = new THREE.Mesh(sideGeo, matWall);
+    wallR2.position.set( 10, 5, -3);
+    bgS.add(wallR2);
+
+    // Piliers
+    const pillarGeo = new THREE.CylinderGeometry(0.38, 0.5, 6, 8);
+    const capGeo    = new THREE.BoxGeometry(1.2, 0.4, 1.2);
+    const baseGeo   = new THREE.BoxGeometry(1.3, 0.3, 1.3);
+    [[-5.5, -3], [5.5, -3], [-5.5, 3], [5.5, 3]].forEach(([px, pz]) => {
+        const p = new THREE.Mesh(pillarGeo, matPillar);
+        p.position.set(px, 3, pz);
+        p.castShadow = p.receiveShadow = true;
+        bgS.add(p);
+        const cap = new THREE.Mesh(capGeo, matCap);
+        cap.position.set(px, 6.2, pz);
+        bgS.add(cap);
+        const base = new THREE.Mesh(baseGeo, matCap);
+        base.position.set(px, 0.15, pz);
+        bgS.add(base);
+    });
+
+    // Allume les torches maintenant que les piliers sont créés
+    torchL.intensity = 3.5;
+    torchR.intensity = 3.5;
+
+    // ── Boucle de rendu du décor ─────────────────────────────────
+    let bgT = 0;
+    function bgLoop(ts) {
+        bgT = ts * 0.001;
+        // Vacillement des torches
+        torchL.intensity = 3 + Math.sin(bgT * 8.3) * 0.9 + Math.sin(bgT * 17.1) * 0.4;
+        torchR.intensity = 3 + Math.sin(bgT * 9.7) * 0.9 + Math.sin(bgT * 13.9) * 0.4;
+        bgR.render(bgS, bgCam);
+        requestAnimationFrame(bgLoop);
+    }
+    requestAnimationFrame(bgLoop);
+})();
+
+// ================================
+// ASSETS — FOND (conservé pour compatibilité)
 // ================================
 const backgroundImage = new Image();
 backgroundImage.src   = `asset/img/background_fight/${_bgFile}`;
@@ -826,8 +984,12 @@ function drawResult() {
 
     if (resultWin) {
         drawResultButton("Continuer", cx, cy + 50, 200, 44, "#c9a84c", "#1a0e00", () => {
-            const pos = (_px && _py) ? `?px=${_px}&py=${_py}` : "";
-            window.location.href = `aventure1.html${pos}`;
+            const rp = new URLSearchParams();
+            if (_px && _py) { rp.set("px", _px); rp.set("py", _py); }
+            const sx = _params.get("espawnX"), sy = _params.get("espawnY");
+            if (sx && sy && Number(sx) > 0) { rp.set("espawnX", sx); rp.set("espawnY", sy); rp.set("result", "win"); }
+            const qs = rp.toString();
+            window.location.href = `aventure1.html${qs ? "?" + qs : ""}`;
         });
     } else {
         drawResultButton("Retour à la carte", cx, cy + 50, 220, 44, "#333", "#fff", () => {
@@ -878,7 +1040,12 @@ function gameLoop(timestamp) {
     lastTime = timestamp;
 
     ctx.clearRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
-    if (backgroundImage.complete) ctx.drawImage(backgroundImage, 0, 0, GAME_WIDTH, GAME_HEIGHT);
+    // Voile sombre au sol pour lisibilité des sprites sur le décor 3D
+    const _bgGrad = ctx.createLinearGradient(0, GAME_HEIGHT * 0.45, 0, GAME_HEIGHT);
+    _bgGrad.addColorStop(0, "rgba(0,0,0,0)");
+    _bgGrad.addColorStop(1, "rgba(0,0,0,0.45)");
+    ctx.fillStyle = _bgGrad;
+    ctx.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
 
     if (gameState === "playing") {
         if (player.aaCancelled) {

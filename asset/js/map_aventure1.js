@@ -55,9 +55,9 @@ const MAP_GRID = [
 ];
 
 const TILE_COLORS = {
-    0: "#1a1a1a",  // mur
+    0: "#1a1a1a",  // vide
     1: "#c4924a",  // couloir marron clair
-    2: "#888888",  // salle gris
+    2: "#888888",  // mur gris
 };
 
 const TILE_SIZE = 28;
@@ -66,67 +66,53 @@ const COLS = MAP_GRID[0].length;
 
 // ── Grille d'objets (même dimensions que MAP_GRID) ───────────
 // 0 = vide  |  1 = coffre fermé  |  2 = coffre ouvert
-// Pour placer un coffre : ITEM_GRID[LIGNE][COLONNE] = 1
 const ITEM_GRID = (function () {
     const g = Array.from({ length: ROWS }, () => new Array(COLS).fill(0));
-    // ── Coffres ──────────────────────────────────────────────
     g[2][5]   = 1;
     g[23][4]  = 1;
     g[23][35] = 1;
     g[31][12] = 1;
     g[31][26] = 1;
-    // ─────────────────────────────────────────────────────────
     return g;
 })();
 
 // ── Grille d'ennemis (même dimensions que MAP_GRID) ─────────
 // 0 = vide  |  1 = skeleton  |  2 = skeleton_archer
-// Pour placer un ennemi : ENNEMI_GRID[LIGNE][COLONNE] = 1 ou 2
 const ENNEMI_GRID = (function () {
     const g = Array.from({ length: ROWS }, () => new Array(COLS).fill(0));
-    // ── Ennemis ───────────────────────────────────────────────
     g[5][10] = 1;  // → skeleton en ligne 5, colonne 10
     g[8][20] = 2;  // → skeleton_archer en ligne 8, colonne 20
-    // ─────────────────────────────────────────────────────────
     return g;
 })();
 
-// Patrouilles optionnelles — clé = "LIGNE,COLONNE" (position de spawn dans ENNEMI_GRID).
-// Si la clé est absente l'ennemi est immobile (move = false).
-// points : liste de [LIGNE, COLONNE] que l'ennemi parcourt en aller-retour.
+// Patrouilles optionnelles — clé = "LIGNE,COLONNE"
 const ENNEMI_PATROL = {
-    // "5,10": { points: [[5,10],[5,18]] },        // → aller-retour col 10 ↔ 18
-    "8,20": { points: [[8,20],[14,20],[14,28]] }, // → 3 waypoints en L
+    // "5,10": { points: [[5,10],[5,18]] },
+    "8,20": { points: [[8,20],[14,20],[14,28]] },
 };
 
 // ── Mouvement ────────────────────────────────────────────────
-const HERO_SPEED    = 120;  // vitesse max en pixels/seconde
-const HERO_ACCEL    = 700;  // accélération (px/s²) — plus élevé = réponse plus rapide
-const HERO_FRICTION = 14;   // décélération au relâchement — plus élevé = arrêt plus brusque
-const HERO_SCALE    = 1.5;  // taille du sprite : 1 = une case, 2 = deux cases, 0.5 = demi-case
-const ENEMY_SCALE   = 1.75;  // taille des sprites ennemis — même référence que HERO_SCALE
-const HERO_ANIM_SLOW = 1.75;  // ralentissement de l'animation idle : 1 = normal, 2 = moitié vitesse, 3 = tiers
-const HERO_WALK_SPEED = 1.5;    // vitesse de l'animation marche : 1 = normal, 2 = double vitesse, 0.5 = moitié
+const HERO_SPEED    = 120;
+const HERO_ACCEL    = 700;
+const HERO_FRICTION = 14;
+const HERO_SCALE    = 1.5;
+const ENEMY_SCALE   = 1.75;
+const HERO_ANIM_SLOW  = 1.75;
+const HERO_WALK_SPEED = 1.5;
 
-const ENEMY_SPEED    = 50;   // vitesse max de patrouille en pixels/seconde
-const ENEMY_ACCEL    = 180;  // accélération (px/s²)
-const ENEMY_FRICTION = 10;   // décélération à l'arrêt (coefficient exponentiel)
+const ENEMY_SPEED    = 50;
+const ENEMY_ACCEL    = 180;
+const ENEMY_FRICTION = 10;
 
-// Rayon de collision du héros (en pixels). Réduire pour passer dans des passages plus étroits.
 const HERO_RADIUS = TILE_SIZE * 0.32;
-
-// Inset visuel du carré bleu des coffres — utilisé à la fois pour le rendu et la collision.
-const CHEST_PAD = Math.floor(TILE_SIZE * 0.18);
+const CHEST_PAD   = Math.floor(TILE_SIZE * 0.18);
 
 // ── Rencontre aléatoire ──────────────────────────────────────
-const ENCOUNTER_MIN     = 15;                              // secondes minimum
-const ENCOUNTER_MAX     = 35;                              // secondes maximum
-const ENCOUNTER_ENEMIES = ["skeleton", "skeleton_archer"]; // ennemis possibles
+const ENCOUNTER_MIN     = 15;
+const ENCOUNTER_MAX     = 35;
+const ENCOUNTER_ENEMIES = ["skeleton", "skeleton_archer"];
 
-// Mettre à true pour activer les combats aléatoires.
 let fight = false;
-
-// Nombre d'ennemis par rencontre (1 à 4). Si 0, le nombre est aléatoire entre 1 et 4.
 const ENCOUNTER_COUNT = 1;
 
 (function () {
@@ -134,22 +120,215 @@ const ENCOUNTER_COUNT = 1;
     const playerId = params.get("player") || "swordsman";
 
     const canvas = document.getElementById("mapCanvas");
-    const ctx    = canvas.getContext("2d");
     const MAP_W  = COLS * TILE_SIZE;
     const MAP_H  = ROWS * TILE_SIZE;
-    let scale = 1, vpW = 0, vpH = 0, camX = 0, camY = 0;
 
-    function resizeCanvas() {
-        // Zoom ancré sur 20 tuiles (référence originale) — la caméra scrolle sur l'excédent.
-        const ZOOM_REF = 20 * TILE_SIZE;
-        scale = Math.max(window.innerWidth / ZOOM_REF, window.innerHeight / ZOOM_REF);
-        canvas.width  = window.innerWidth;
-        canvas.height = window.innerHeight;
-        vpW = canvas.width  / scale;  // zone logique visible en largeur
-        vpH = canvas.height / scale;  // zone logique visible en hauteur
+    // ── Three.js — Renderer ──────────────────────────────────────
+    const TW = 1; // 1 unité monde = 1 tuile (TILE_SIZE px)
+
+    const renderer = new THREE.WebGLRenderer({ canvas, antialias: false });
+    renderer.setPixelRatio(1);
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.BasicShadowMap;
+
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x080808);
+    scene.fog = new THREE.Fog(0x080808, 20, 36);
+
+    const camera = new THREE.PerspectiveCamera(60, 1, 0.1, 60);
+
+    function onResize() {
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
     }
-    window.addEventListener("resize", resizeCanvas);
-    resizeCanvas();
+    window.addEventListener("resize", onResize);
+    onResize();
+
+    // ── Lumières ─────────────────────────────────────────────────
+    scene.add(new THREE.AmbientLight(0x504040, 2.5));
+    const sun = new THREE.DirectionalLight(0xffc060, 1.8);
+    sun.position.set(6, 14, 10);
+    sun.castShadow = true;
+    sun.shadow.mapSize.set(1024, 1024);
+    sun.shadow.camera.near = 0.5;
+    sun.shadow.camera.far  = 60;
+    sun.shadow.camera.left = sun.shadow.camera.bottom = -22;
+    sun.shadow.camera.right = sun.shadow.camera.top   =  22;
+    scene.add(sun);
+
+    const heroLight = new THREE.PointLight(0xc9a84c, 2.5, 6);
+    scene.add(heroLight);
+
+    // ── Textures pixel-art procédurales ──────────────────────────
+    function pixelTex(fn, size) {
+        size = size || 16;
+        const c  = document.createElement("canvas");
+        c.width  = c.height = size;
+        const cx = c.getContext("2d");
+        function px(x, y, col) { cx.fillStyle = col; cx.fillRect(x, y, 1, 1); }
+        fn(cx, px);
+        const t = new THREE.CanvasTexture(c);
+        t.magFilter = THREE.NearestFilter;
+        t.minFilter = THREE.NearestFilter;
+        return t;
+    }
+
+    // Sol donjon — dalles 32×32, joints tous les 16px
+    const texFloor = pixelTex(function (cx, px) {
+        const slabCols = ["#8a7a5c", "#7c6e4e", "#948464", "#86745a"];
+        for (let y = 0; y < 32; y++) {
+            for (let x = 0; x < 32; x++) {
+                if (x === 0 || y === 0 || x === 16 || y === 16) {
+                    px(x, y, "#3a3028");
+                } else {
+                    const si = (x > 16 ? 1 : 0) + (y > 16 ? 2 : 0);
+                    const edge = (x === 1 || x === 15 || x === 17 || x === 31 ||
+                                  y === 1 || y === 15 || y === 17 || y === 31);
+                    const noise = ((x * 11 + y * 7) % 13 < 2) ? -14 : 0;
+                    const b = parseInt(slabCols[si].slice(1), 16);
+                    const r = (b >> 16) & 0xff, g = (b >> 8) & 0xff, bl = b & 0xff;
+                    const adj = noise + (edge ? -12 : 0);
+                    const c = n => Math.max(0, Math.min(255, n)).toString(16).padStart(2, "0");
+                    px(x, y, "#" + c(r + adj) + c(g + adj) + c(bl + adj));
+                }
+            }
+        }
+        // Fissures
+        [[5,4],[9,19],[23,8],[28,26],[14,29],[3,22]].forEach(b => px(b[0], b[1], "#524438"));
+    }, 32);
+
+    // Mur donjon — briques 32×32 avec décalage alterné
+    const texWall = pixelTex(function (cx, px) {
+        for (let y = 0; y < 32; y++) {
+            for (let x = 0; x < 32; x++) {
+                const row = Math.floor(y / 8);
+                const xOff = (row % 2) === 0 ? 0 : 16;
+                const isH = (y % 8 === 0);
+                const isV = ((x + xOff) % 20 === 0);
+                if (isH || isV) {
+                    px(x, y, "#0a0816");
+                } else {
+                    const brickId = Math.floor((x + xOff) / 20) + row;
+                    const base = brickId % 3 === 0 ? "#26223c" : brickId % 3 === 1 ? "#1e1c30" : "#222038";
+                    const inner = ((x + xOff) % 20 > 2 && (x + xOff) % 20 < 17 && y % 8 > 1 && y % 8 < 6);
+                    px(x, y, inner ? base : "#141228");
+                }
+            }
+        }
+    }, 32);
+
+    // Dessus de mur 32×32
+    const texWallTop = pixelTex(function (cx, px) {
+        for (let y = 0; y < 32; y++) for (let x = 0; x < 32; x++)
+            px(x, y, ((x * 5 + y * 7) % 13 < 2) ? "#1a1830" : "#141226");
+        [[3,5],[8,14],[16,4],[24,22],[11,26],[28,10]].forEach(b => px(b[0], b[1], "#22203a"));
+    }, 32);
+
+    const matFloor   = new THREE.MeshLambertMaterial({ map: texFloor });
+    const matWallS   = new THREE.MeshLambertMaterial({ map: texWall });
+    const matWallT   = new THREE.MeshLambertMaterial({ map: texWallTop });
+    // BoxGeometry face order: +x, -x, +y (top), -y, +z, -z
+    const wallMats   = [matWallS, matWallS, matWallT, matWallS, matWallS, matWallS];
+
+    // ── Géométries de tuiles (InstancedMesh) ─────────────────────
+    const WALL_H = 1.4;
+    const CAP_H  = 0.12;
+
+    let floorCnt = 0, wallCnt = 0;
+    for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) {
+        if (MAP_GRID[r][c] === 1) floorCnt++;
+        else if (MAP_GRID[r][c] === 2) wallCnt++;
+    }
+
+    const geoFloorT = new THREE.PlaneGeometry(TW, TW);
+    const geoWallB  = new THREE.BoxGeometry(TW, WALL_H, TW);
+    const geoWallC  = new THREE.BoxGeometry(TW, CAP_H, TW);
+
+    const floorInst = new THREE.InstancedMesh(geoFloorT, matFloor, floorCnt);
+    const wallInst  = new THREE.InstancedMesh(geoWallB, wallMats, wallCnt);
+    const capInst   = new THREE.InstancedMesh(geoWallC, matWallT, wallCnt);
+    floorInst.receiveShadow = true;
+    wallInst.castShadow = wallInst.receiveShadow = true;
+    scene.add(floorInst);
+    scene.add(wallInst);
+    scene.add(capInst);
+
+    const dummy = new THREE.Object3D();
+    let fi = 0, wi = 0;
+    for (let r = 0; r < ROWS; r++) {
+        for (let c = 0; c < COLS; c++) {
+            const tile = MAP_GRID[r][c];
+            const wx = (c + 0.5) * TW;
+            const wz = (r + 0.5) * TW;
+            if (tile === 1) {
+                dummy.position.set(wx, 0, wz);
+                dummy.rotation.set(-Math.PI / 2, 0, 0);
+                dummy.scale.set(1, 1, 1);
+                dummy.updateMatrix();
+                floorInst.setMatrixAt(fi++, dummy.matrix);
+            } else if (tile === 2) {
+                dummy.rotation.set(0, 0, 0);
+                dummy.scale.set(1, 1, 1);
+                dummy.position.set(wx, WALL_H / 2, wz);
+                dummy.updateMatrix();
+                wallInst.setMatrixAt(wi, dummy.matrix);
+                dummy.position.set(wx, WALL_H + CAP_H / 2, wz);
+                dummy.updateMatrix();
+                capInst.setMatrixAt(wi, dummy.matrix);
+                wi++;
+            }
+        }
+    }
+    floorInst.instanceMatrix.needsUpdate = true;
+    wallInst.instanceMatrix.needsUpdate  = true;
+    capInst.instanceMatrix.needsUpdate   = true;
+
+    // ── Coffres ───────────────────────────────────────────────────
+    const chestObjs = [];
+    for (let r = 0; r < ROWS; r++) {
+        for (let c = 0; c < COLS; c++) {
+            if (ITEM_GRID[r][c] !== 1) continue;
+            const cmat  = new THREE.MeshLambertMaterial({ color: 0x2563eb, emissive: 0x0022aa, emissiveIntensity: 0.5 });
+            const cmesh = new THREE.Mesh(new THREE.BoxGeometry(0.48, 0.48, 0.48), cmat);
+            cmesh.position.set((c + 0.5) * TW, 0.24, (r + 0.5) * TW);
+            cmesh.castShadow = true;
+            scene.add(cmesh);
+            chestObjs.push({ mesh: cmesh, mat: cmat, row: r, col: c });
+        }
+    }
+
+    // ── Indicateur de cible souris ───────────────────────────────
+    const geoRing = new THREE.RingGeometry(0.18, 0.28, 16);
+    const matRing = new THREE.MeshBasicMaterial({ color: 0xc9a84c, side: THREE.DoubleSide, transparent: true, opacity: 0.7 });
+    const targetMesh = new THREE.Mesh(geoRing, matRing);
+    targetMesh.rotation.x = -Math.PI / 2;
+    targetMesh.position.y = 0.03;
+    targetMesh.visible = false;
+    scene.add(targetMesh);
+
+    // ── Sprites (canvas texture → THREE.Sprite) ──────────────────
+    const SPR_SIZE = 128;
+
+    function makeSpriteObj(worldScale) {
+        const sc  = document.createElement("canvas");
+        sc.width  = sc.height = SPR_SIZE;
+        const sctx = sc.getContext("2d");
+        const tex  = new THREE.CanvasTexture(sc);
+        tex.magFilter = THREE.NearestFilter;
+        tex.minFilter = THREE.NearestFilter;
+        const mat  = new THREE.SpriteMaterial({ map: tex, transparent: true });
+        const spr  = new THREE.Sprite(mat);
+        spr.scale.set(worldScale, worldScale, 1);
+        spr.center.set(0.5, 0); // ancre bas du sprite → pieds au sol (y=0)
+        scene.add(spr);
+        return { spr, sctx, tex };
+    }
+
+    const HERO_WS  = 1.6;
+    const ENEMY_WS = 1.8;
+
+    const heroSpr = makeSpriteObj(HERO_WS);
 
     // ── Rencontre aléatoire ──────────────────────────────────────
     let encounterTimer = ENCOUNTER_MIN + Math.random() * (ENCOUNTER_MAX - ENCOUNTER_MIN);
@@ -169,16 +348,27 @@ const ENCOUNTER_COUNT = 1;
     });
     document.body.appendChild(encOverlay);
 
+    let _fightEnemySpawnX = -1, _fightEnemySpawnY = -1;
+
     function triggerEncounter(forcedEnemy) {
         combatActive = true;
         encounterTimer = ENCOUNTER_MIN + Math.random() * (ENCOUNTER_MAX - ENCOUNTER_MIN);
+        // Mémorise les coords de spawn si c'est un ennemi de la map
+        if (forcedEnemy && typeof forcedEnemy === "object") {
+            _fightEnemySpawnX = Math.round(forcedEnemy.spawnX);
+            _fightEnemySpawnY = Math.round(forcedEnemy.spawnY);
+        } else {
+            _fightEnemySpawnX = -1;
+            _fightEnemySpawnY = -1;
+        }
+        const forcedType = typeof forcedEnemy === "string" ? forcedEnemy : (forcedEnemy?.type ?? null);
         encOverlay.style.display = "flex";
         let count = 1;
         document.getElementById("enc-count").textContent = count;
         const iv = setInterval(() => {
             count--;
             document.getElementById("enc-count").textContent = Math.max(0, count);
-            if (count <= 0) { clearInterval(iv); goFight(forcedEnemy); }
+            if (count <= 0) { clearInterval(iv); goFight(forcedType); }
         }, 1000);
     }
 
@@ -188,27 +378,26 @@ const ENCOUNTER_COUNT = 1;
         window.location.href =
             `fight_aventure1.html?arena=1&player=${playerId}&bg=arene.jpg&enemy=${enemy}` +
             `&count=${count}&from=aventure1&mapW=${MAP_W}&mapH=${MAP_H}` +
-            `&px=${Math.round(hero.x)}&py=${Math.round(hero.y)}`;
+            `&px=${Math.round(hero.x)}&py=${Math.round(hero.y)}` +
+            `&espawnX=${_fightEnemySpawnX}&espawnY=${_fightEnemySpawnY}`;
     }
 
-    // Position en pixels (centre du héros), spawn dans la première case marchable
+    // ── Héros ────────────────────────────────────────────────────
     const _retX = Number(params.get("px"));
     const _retY = Number(params.get("py"));
     const hero = {
         x: _retX > 0 ? _retX : 1.5 * TILE_SIZE,
         y: _retY > 0 ? _retY : 1.5 * TILE_SIZE,
         vx: 0, vy: 0,
-        facing: 1,      // 1 = droite, -1 = gauche
+        facing: 1,
         isMoving: false,
-        target: null,   // destination souris { x, y } ou null
+        target: null,
         spriteW: 0, spriteH: 0,
-        // animation idle
         frames: [], frameIdx: 0, elapsed: 0, frameTime: 0.12,
-        // animation walk
         walkFrames: [], walkFrameIdx: 0, walkElapsed: 0, walkFrameTime: 0.1,
     };
 
-    // ── Initialisation des ennemis depuis ENNEMI_GRID ────────────
+    // ── Ennemis depuis ENNEMI_GRID ───────────────────────────────
     const enemies = [];
     for (let r = 0; r < ROWS; r++) {
         for (let c = 0; c < COLS; c++) {
@@ -219,25 +408,56 @@ const ENCOUNTER_COUNT = 1;
                 type: type === 1 ? "skeleton" : "skeleton_archer",
                 x: (c + 0.5) * TILE_SIZE,
                 y: (r + 0.5) * TILE_SIZE,
+                spawnX: (c + 0.5) * TILE_SIZE,
+                spawnY: (r + 0.5) * TILE_SIZE,
                 move: !!config,
                 patrolPoints: config
                     ? config.points.map(([pr, pc]) => ({ x: (pc + 0.5) * TILE_SIZE, y: (pr + 0.5) * TILE_SIZE }))
                     : [],
                 patrolIdx: 0,
-                patrolDir: 1,  // 1 = vers l'avant, -1 = vers l'arrière
+                patrolDir: 1,
                 vx: 0, vy: 0,
                 facing: 1,
                 facingTimer: 0,
                 isMoving: false,
-                frameIdx: 0,
-                elapsed: 0,
-                walkFrameIdx: 0,
-                walkElapsed: 0,
+                frameIdx: 0, elapsed: 0,
+                walkFrameIdx: 0, walkElapsed: 0,
             });
         }
     }
 
-    // ── Cache de sprites ennemis (partagé par type) ──────────────
+    // Un sprite 3D par ennemi
+    const enemySprs = enemies.map(() => makeSpriteObj(ENEMY_WS));
+
+    // Supprime l'ennemi vaincu au retour du combat
+    const _espawnX = Number(params.get("espawnX")) || -1;
+    const _espawnY = Number(params.get("espawnY")) || -1;
+    if (params.get("result") === "win" && _espawnX > 0 && _espawnY > 0) {
+        const di = enemies.findIndex(e => Math.abs(e.spawnX - _espawnX) < 1 && Math.abs(e.spawnY - _espawnY) < 1);
+        if (di >= 0) {
+            scene.remove(enemySprs[di].spr);
+            enemies.splice(di, 1);
+            enemySprs.splice(di, 1);
+        }
+    }
+
+    // ── Hitboxes de debug ────────────────────────────────────────
+    const HBR = HERO_RADIUS / TILE_SIZE; // 0.32 unités monde
+    const hbGeo = new THREE.RingGeometry(HBR - 0.025, HBR, 24);
+    const heroHB = new THREE.Mesh(hbGeo, new THREE.MeshBasicMaterial({ color: 0x00ff88, side: THREE.DoubleSide }));
+    heroHB.rotation.x = -Math.PI / 2;
+    heroHB.position.y = 0.015;
+    scene.add(heroHB);
+
+    const enemyHBs = enemies.map(() => {
+        const m = new THREE.Mesh(hbGeo, new THREE.MeshBasicMaterial({ color: 0xff3311, side: THREE.DoubleSide }));
+        m.rotation.x = -Math.PI / 2;
+        m.position.y = 0.015;
+        scene.add(m);
+        return m;
+    });
+
+    // ── Cache de sprites ennemis ─────────────────────────────────
     const SPRITE_CACHE = {};
     function loadEnemySprites() {
         const types = [...new Set(enemies.map(e => e.type))];
@@ -266,7 +486,7 @@ const ENCOUNTER_COUNT = 1;
         }
     }
 
-    // ── Chargement des sprites du héros ──────────────────────────
+    // ── Sprites du héros ─────────────────────────────────────────
     function loadHeroSprites() {
         if (typeof CHARACTERS_REGISTRY === "undefined") return;
         const charFn = CHARACTERS_REGISTRY[playerId];
@@ -298,7 +518,7 @@ const ENCOUNTER_COUNT = 1;
         }
     }
 
-    // ── Collision : seul le tile 1 est marchable ─────────────────
+    // ── Collision ────────────────────────────────────────────────
     function tileAt(px, py) {
         const c = Math.floor(px / TILE_SIZE);
         const r = Math.floor(py / TILE_SIZE);
@@ -306,7 +526,6 @@ const ENCOUNTER_COUNT = 1;
         return MAP_GRID[r][c];
     }
 
-    // Teste si le rectangle du héros chevauche le carré bleu d'un coffre fermé (AABB).
     function chestBlocksAt(hx, hy) {
         const hr = HERO_RADIUS;
         const hL = hx - hr, hR = hx + hr, hT = hy - hr, hB = hy + hr;
@@ -333,9 +552,6 @@ const ENCOUNTER_COUNT = 1;
                !chestBlocksAt(px, py);
     }
 
-    // Retourne {row,col} du coffre fermé adjacent au héros, ou null.
-    // La zone de détection est élargie de CHEST_REACH px au-delà du bord bloquant,
-    // car canOccupy empêche le héros d'entrer dans l'AABB exacte du coffre.
     const CHEST_REACH = 4;
     function chestInContact() {
         const hr = HERO_RADIUS;
@@ -355,32 +571,26 @@ const ENCOUNTER_COUNT = 1;
         return null;
     }
 
-    // ── Mise à jour du mouvement ──────────────────────────────────
+    // ── Mise à jour du héros ─────────────────────────────────────
     const keys = new Set();
 
     function updateHero(dt) {
+        // Vecteurs avant/droite dans le plan du sol selon l'angle de caméra
+        const fwdX = -Math.sin(camTheta), fwdZ = -Math.cos(camTheta);
+        const rigX =  Math.cos(camTheta), rigZ = -Math.sin(camTheta);
         let ix = 0, iy = 0;
-        if (keys.has("ArrowUp")    || keys.has("z")) iy -= 1;
-        if (keys.has("ArrowDown")  || keys.has("s")) iy += 1;
-        if (keys.has("ArrowLeft")  || keys.has("q")) ix -= 1;
-        if (keys.has("ArrowRight") || keys.has("d")) ix += 1;
+        if (keys.has("ArrowUp")    || keys.has("z")) { ix += fwdX; iy += fwdZ; }
+        if (keys.has("ArrowDown")  || keys.has("s")) { ix -= fwdX; iy -= fwdZ; }
+        if (keys.has("ArrowLeft")  || keys.has("q")) { ix -= rigX; iy -= rigZ; }
+        if (keys.has("ArrowRight") || keys.has("d")) { ix += rigX; iy += rigZ; }
 
         if (ix !== 0 || iy !== 0) {
-            hero.target = null; // clavier annule la cible souris
-            if (ix !== 0) hero.facing = ix > 0 ? 1 : -1;
-
-            // Accélération normalisée (diagonale = même vitesse)
+            hero.target = null;
             const len = Math.sqrt(ix * ix + iy * iy);
             hero.vx += (ix / len) * HERO_ACCEL * dt;
             hero.vy += (iy / len) * HERO_ACCEL * dt;
-
-            // Plafond à HERO_SPEED
             const speed = Math.sqrt(hero.vx * hero.vx + hero.vy * hero.vy);
-            if (speed > HERO_SPEED) {
-                const ratio = HERO_SPEED / speed;
-                hero.vx *= ratio;
-                hero.vy *= ratio;
-            }
+            if (speed > HERO_SPEED) { hero.vx *= HERO_SPEED / speed; hero.vy *= HERO_SPEED / speed; }
         } else if (hero.target) {
             const dx   = hero.target.x - hero.x;
             const dy   = hero.target.y - hero.y;
@@ -388,22 +598,16 @@ const ENCOUNTER_COUNT = 1;
             if (dist < TILE_SIZE * 0.35) {
                 hero.target = null;
             } else {
-                ix = dx / dist;
-                iy = dy / dist;
-                if (ix !== 0) hero.facing = ix > 0 ? 1 : -1;
+                ix = dx / dist; iy = dy / dist;
                 const len = Math.sqrt(ix * ix + iy * iy);
                 hero.vx += (ix / len) * HERO_ACCEL * dt;
                 hero.vy += (iy / len) * HERO_ACCEL * dt;
                 const speed = Math.sqrt(hero.vx * hero.vx + hero.vy * hero.vy);
-                if (speed > HERO_SPEED) {
-                    hero.vx *= HERO_SPEED / speed;
-                    hero.vy *= HERO_SPEED / speed;
-                }
+                if (speed > HERO_SPEED) { hero.vx *= HERO_SPEED / speed; hero.vy *= HERO_SPEED / speed; }
             }
         }
 
         if (ix === 0 && iy === 0 && !hero.target) {
-            // Friction exponentielle indépendante du framerate
             const decay = Math.exp(-HERO_FRICTION * dt);
             hero.vx *= decay;
             hero.vy *= decay;
@@ -411,57 +615,49 @@ const ENCOUNTER_COUNT = 1;
             if (Math.abs(hero.vy) < 0.5) hero.vy = 0;
         }
 
-        // Application avec glissement le long des murs
         const prevX = hero.x, prevY = hero.y;
-        const mx = hero.vx * dt;
-        const my = hero.vy * dt;
+        const mx = hero.vx * dt, my = hero.vy * dt;
         if (canOccupy(hero.x + mx, hero.y)) hero.x += mx; else hero.vx = 0;
         if (canOccupy(hero.x, hero.y + my)) hero.y += my; else hero.vy = 0;
 
-        // Navigation souris : annule la cible si le héros est bloqué des deux côtés
         if (hero.target && (mx !== 0 || my !== 0) && hero.x === prevX && hero.y === prevY) {
             hero.target = null;
         }
 
-        // Walk si le héros a réellement bougé, sinon idle
         hero.isMoving = Math.abs(hero.x - prevX) > 0.1 || Math.abs(hero.y - prevY) > 0.1;
-
+        // Orientation dans l'espace caméra : droite caméra = composante positive → facing 1
+        if (hero.isMoving) {
+            const camRight = hero.vx * Math.cos(camTheta) - hero.vy * Math.sin(camTheta);
+            if (Math.abs(camRight) > 0.3) hero.facing = camRight > 0 ? 1 : -1;
+        }
     }
 
-    // ── Mise à jour des ennemis (patrouille) ─────────────────────
-    const ENEMY_FLIP_INTERVAL = 3; // secondes entre chaque changement de sens (ennemis immobiles)
+    // ── Mise à jour des ennemis ──────────────────────────────────
+    const ENEMY_FLIP_INTERVAL = 3;
 
     function updateEnemies(dt) {
         for (const e of enemies) {
             if (!e.move || e.patrolPoints.length < 2) {
-                // Immobile : retournement périodique
                 e.facingTimer += dt;
-                if (e.facingTimer >= ENEMY_FLIP_INTERVAL) {
-                    e.facingTimer = 0;
-                    e.facing *= -1;
-                }
+                if (e.facingTimer >= ENEMY_FLIP_INTERVAL) { e.facingTimer = 0; e.facing *= -1; }
                 e.isMoving = false;
                 continue;
             }
             const target = e.patrolPoints[e.patrolIdx];
-            const dx = target.x - e.x;
-            const dy = target.y - e.y;
+            const dx = target.x - e.x, dy = target.y - e.y;
             const dist = Math.sqrt(dx * dx + dy * dy);
             if (dist < TILE_SIZE * 0.3) {
-                // Waypoint atteint : friction pour freiner, puis passer au suivant
                 const decay = Math.exp(-ENEMY_FRICTION * dt);
-                e.vx *= decay;
-                e.vy *= decay;
+                e.vx *= decay; e.vy *= decay;
                 if (Math.abs(e.vx) < 0.5 && Math.abs(e.vy) < 0.5) {
                     e.vx = 0; e.vy = 0;
                     const next = e.patrolIdx + e.patrolDir;
                     if (next < 0 || next >= e.patrolPoints.length) {
                         e.patrolDir *= -1;
                         e.patrolIdx += e.patrolDir;
-                        e.facing *= -1; // demi-tour : inverse le sens
+                        e.facing *= -1;
                     } else {
                         e.patrolIdx = next;
-                        // Met à jour le sens selon la prochaine direction
                         const np = e.patrolPoints[e.patrolIdx];
                         const ndx = np.x - e.x;
                         if (Math.abs(ndx) > 1) e.facing = ndx > 0 ? 1 : -1;
@@ -470,10 +666,8 @@ const ENCOUNTER_COUNT = 1;
                 }
                 e.isMoving = Math.abs(e.vx) > 0.5 || Math.abs(e.vy) > 0.5;
             } else {
-                // En route : accélération vers la cible, plafond à ENEMY_SPEED
                 const ix = dx / dist, iy = dy / dist;
-                e.vx += ix * ENEMY_ACCEL * dt;
-                e.vy += iy * ENEMY_ACCEL * dt;
+                e.vx += ix * ENEMY_ACCEL * dt; e.vy += iy * ENEMY_ACCEL * dt;
                 const speed = Math.sqrt(e.vx * e.vx + e.vy * e.vy);
                 if (speed > ENEMY_SPEED) { e.vx *= ENEMY_SPEED / speed; e.vy *= ENEMY_SPEED / speed; }
                 e.isMoving = true;
@@ -484,159 +678,119 @@ const ENCOUNTER_COUNT = 1;
         }
     }
 
-    // ── Rendu de la grille ────────────────────────────────────────
-    function drawGrid() {
-        for (let r = 0; r < ROWS; r++) {
-            for (let c = 0; c < COLS; c++) {
-                const tile = MAP_GRID[r][c];
-                const item = ITEM_GRID[r][c];
-
-                // Terrain
-                ctx.fillStyle = TILE_COLORS[tile] ?? "#000";
-                ctx.fillRect(c * TILE_SIZE, r * TILE_SIZE, TILE_SIZE, TILE_SIZE);
-                if (tile === 1) {
-                    ctx.strokeStyle = "rgba(0,0,0,0.2)";
-                    ctx.lineWidth   = 0.5;
-                    ctx.strokeRect(c * TILE_SIZE + 0.5, r * TILE_SIZE + 0.5, TILE_SIZE - 1, TILE_SIZE - 1);
-                }
-
-                // Objets (ITEM_GRID)
-                if (item === 1 || item === 2) {
-                    const pad = CHEST_PAD;
-                    const bx  = c * TILE_SIZE + pad;
-                    const by  = r * TILE_SIZE + pad;
-                    const bw  = TILE_SIZE - pad * 2;
-                    if (item === 1) {
-                        // Coffre fermé : carré bleu plein
-                        ctx.fillStyle = "#2563eb";
-                        ctx.fillRect(bx, by, bw, bw);
-                        ctx.strokeStyle = "#1a3fa8";
-                        ctx.lineWidth = 1;
-                        ctx.strokeRect(bx + 0.5, by + 0.5, bw - 1, bw - 1);
-                    } else {
-                        // Coffre ouvert : carré bleu vide
-                        ctx.strokeStyle = "#2563eb";
-                        ctx.lineWidth = 2;
-                        ctx.strokeRect(bx + 1, by + 1, bw - 2, bw - 2);
-                    }
-                }
-            }
-        }
-    }
-
-    // ── Rendu du héros ───────────────────────────────────────────
-    function drawHero(dt) {
-        // Halo doré
-        ctx.save();
-        ctx.shadowColor = "rgba(201,168,76,0.7)";
-        ctx.shadowBlur  = 12;
-        ctx.fillStyle   = "rgba(201,168,76,0.12)";
-        ctx.fillRect(hero.x - TILE_SIZE / 2 + 2, hero.y - TILE_SIZE / 2 + 2, TILE_SIZE - 4, TILE_SIZE - 4);
-        ctx.restore();
-
-        // Choisit l'animation selon l'état du héros
-        const useWalk   = hero.isMoving && hero.walkFrames.filter(Boolean).length > 0;
-        const animFrames = useWalk ? hero.walkFrames.filter(Boolean) : hero.frames.filter(Boolean);
-        const frameTime  = useWalk ? hero.walkFrameTime : hero.frameTime;
-
-        if (useWalk) {
-            hero.walkElapsed += dt;
-            if (hero.walkElapsed >= frameTime) {
-                hero.walkElapsed  -= frameTime;
-                hero.walkFrameIdx  = (hero.walkFrameIdx + 1) % animFrames.length;
-            }
-        } else {
-            hero.elapsed += dt;
-            if (hero.elapsed >= frameTime) {
-                hero.elapsed  -= frameTime;
-                hero.frameIdx  = (hero.frameIdx + 1) % (animFrames.length || 1);
-            }
-        }
-
-        if (animFrames.length > 0 && hero.spriteW > 0) {
-            const frameIdx = useWalk ? hero.walkFrameIdx : hero.frameIdx;
-            const img      = animFrames[Math.min(frameIdx, animFrames.length - 1)];
-            const scale    = Math.min(TILE_SIZE / hero.spriteW, TILE_SIZE / hero.spriteH) * HERO_SCALE;
-            const dw       = hero.spriteW * scale;
-            const dh       = hero.spriteH * scale;
-
-            ctx.save();
-            ctx.translate(hero.x, hero.y);
-            ctx.scale(hero.facing, 1);
-            ctx.drawImage(img, -dw / 2, -dh / 2, dw, dh);
-            ctx.restore();
-        } else {
-            // Fallback : cercle doré
-            ctx.fillStyle   = "#e8c84a";
-            ctx.beginPath();
-            ctx.arc(hero.x, hero.y, TILE_SIZE * 0.32, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.strokeStyle = "#a0882a";
-            ctx.lineWidth   = 1.5;
-            ctx.stroke();
-        }
-    }
-
-    // ── Rendu des ennemis (sprite animé, fallback cercle) ────────
-    function drawEnemies(dt) {
-        const refW = hero.spriteW || TILE_SIZE;
-        const refH = hero.spriteH || TILE_SIZE;
-        const s = Math.min(TILE_SIZE / refW, TILE_SIZE / refH) * ENEMY_SCALE;
-
-        for (const e of enemies) {
-            const typeCache = SPRITE_CACHE[e.type];
-            const anim = typeCache && (e.isMoving && typeCache.walk ? typeCache.walk : typeCache.idle);
-
-            if (anim) {
-                const loaded = anim.frames.filter(Boolean);
-                if (loaded.length > 0) {
-                    if (e.isMoving) {
-                        e.walkElapsed += dt;
-                        if (e.walkElapsed >= anim.frameTime) {
-                            e.walkElapsed -= anim.frameTime;
-                            e.walkFrameIdx = (e.walkFrameIdx + 1) % loaded.length;
-                        }
-                    } else {
-                        e.elapsed += dt;
-                        if (e.elapsed >= anim.frameTime) {
-                            e.elapsed -= anim.frameTime;
-                            e.frameIdx = (e.frameIdx + 1) % loaded.length;
-                        }
-                    }
-                    const idx = e.isMoving ? e.walkFrameIdx : e.frameIdx;
-                    const img = loaded[Math.min(idx, loaded.length - 1)];
-                    ctx.save();
-                    ctx.translate(e.x, e.y);
-                    ctx.scale(e.facing, 1);
-                    const idleW = (typeCache.idle?.spriteW ?? anim.spriteW) * s;
-                    const idleH = (typeCache.idle?.spriteH ?? anim.spriteH) * s;
-                    ctx.drawImage(img, -idleW / 2, -idleH / 2, idleW, idleH);
-                    ctx.restore();
-                    continue;
-                }
-            }
-            // Fallback : cercle coloré si les sprites ne sont pas encore chargés
-            ctx.beginPath();
-            ctx.arc(e.x, e.y, TILE_SIZE * 0.3, 0, Math.PI * 2);
-            ctx.fillStyle = e.type === "skeleton" ? "#e55555" : "#e09020";
-            ctx.fill();
-            ctx.strokeStyle = "rgba(0,0,0,0.6)";
-            ctx.lineWidth = 1.5;
-            ctx.stroke();
-        }
-    }
-
-    // ── Collision héros ↔ ennemi → déclenche le combat ──────────
+    // ── Collision héros ↔ ennemi ─────────────────────────────────
     function checkEnemyCollision() {
         const contactDist = HERO_RADIUS * 2;
         for (const e of enemies) {
-            const dx = hero.x - e.x;
-            const dy = hero.y - e.y;
+            const dx = hero.x - e.x, dy = hero.y - e.y;
             if (dx * dx + dy * dy < contactDist * contactDist) {
-                triggerEncounter(e.type);
+                triggerEncounter(e); // passe l'objet pour mémoriser le spawn
                 return;
             }
         }
+    }
+
+    // ── Caméra orbitale ──────────────────────────────────────────
+    let camTheta  = 0;          // angle horizontal autour du héros (rad)
+    let camPhi    = 1.05;       // angle vertical (~60°, calque sur la vue initiale)
+    let camRadius = 12;         // distance héros-caméra
+    const CAM_PHI_MIN = 0.18;  // ~10° (quasi horizontal)
+    const CAM_PHI_MAX = 1.48;  // ~85° (quasi zenith)
+    const CAM_R_MIN   = 3;
+    const CAM_R_MAX   = 20;
+
+    let orbitDragging = false;
+    let orbitLastX = 0, orbitLastY = 0;
+
+    // ── Rendu d'un sprite sur canvas texture ─────────────────────
+    function updateSpriteCanvas(spObj, img, sw, sh, facing) {
+        const { sctx, tex } = spObj;
+        sctx.clearRect(0, 0, SPR_SIZE, SPR_SIZE);
+        if (img && sw > 0) {
+            const sc = Math.min(SPR_SIZE / sw, SPR_SIZE / sh) * 0.92;
+            sctx.save();
+            sctx.translate(SPR_SIZE / 2, SPR_SIZE); // ancre en bas → pieds au bas du canvas
+            sctx.scale(facing, 1);
+            sctx.drawImage(img, -sw * sc / 2, -sh * sc, sw * sc, sh * sc);
+            sctx.restore();
+        }
+        tex.needsUpdate = true;
+    }
+
+    // ── Rendu Three.js ───────────────────────────────────────────
+    function render3D(dt) {
+        // Coffres — mise à jour couleur si ouvert
+        for (const co of chestObjs) {
+            const open = ITEM_GRID[co.row][co.col] === 2;
+            co.mat.color.set(open ? 0x334488 : 0x2563eb);
+            co.mat.emissive.set(open ? 0x000000 : 0x001880);
+            co.mat.emissiveIntensity = open ? 0 : 0.5;
+        }
+
+        // Indicateur cible
+        if (hero.target) {
+            targetMesh.visible = true;
+            targetMesh.position.x = hero.target.x / TILE_SIZE;
+            targetMesh.position.z = hero.target.y / TILE_SIZE;
+        } else {
+            targetMesh.visible = false;
+        }
+
+        // Lumière dorée autour du héros
+        heroLight.position.set(hero.x / TILE_SIZE, 1.5, hero.y / TILE_SIZE);
+
+        // Sprite héros
+        const useWalk  = hero.isMoving && hero.walkFrames.filter(Boolean).length > 0;
+        const animFr   = useWalk ? hero.walkFrames.filter(Boolean) : hero.frames.filter(Boolean);
+        const ft       = useWalk ? hero.walkFrameTime : hero.frameTime;
+        if (useWalk) {
+            hero.walkElapsed += dt;
+            if (hero.walkElapsed >= ft) { hero.walkElapsed -= ft; hero.walkFrameIdx = (hero.walkFrameIdx + 1) % animFr.length; }
+        } else {
+            hero.elapsed += dt;
+            if (hero.elapsed >= ft) { hero.elapsed -= ft; hero.frameIdx = (hero.frameIdx + 1) % (animFr.length || 1); }
+        }
+        const hIdx = useWalk ? hero.walkFrameIdx : hero.frameIdx;
+        const hImg = animFr[Math.min(hIdx, animFr.length - 1)] || null;
+        updateSpriteCanvas(heroSpr, hImg, hero.spriteW, hero.spriteH, hero.facing);
+        heroSpr.spr.position.set(hero.x / TILE_SIZE, 0, hero.y / TILE_SIZE);
+        heroHB.position.x = hero.x / TILE_SIZE;
+        heroHB.position.z = hero.y / TILE_SIZE;
+
+        // Sprites ennemis
+        enemies.forEach((e, i) => {
+            const ec   = SPRITE_CACHE[e.type];
+            const anim = ec && (e.isMoving && ec.walk ? ec.walk : ec.idle);
+            const loaded = anim ? anim.frames.filter(Boolean) : [];
+            const ft2  = anim ? anim.frameTime : 0.12;
+            if (e.isMoving) {
+                e.walkElapsed += dt;
+                if (e.walkElapsed >= ft2) { e.walkElapsed -= ft2; e.walkFrameIdx = (e.walkFrameIdx + 1) % (loaded.length || 1); }
+            } else {
+                e.elapsed += dt;
+                if (e.elapsed >= ft2) { e.elapsed -= ft2; e.frameIdx = (e.frameIdx + 1) % (loaded.length || 1); }
+            }
+            const eIdx = e.isMoving ? e.walkFrameIdx : e.frameIdx;
+            const eImg = loaded[Math.min(eIdx, loaded.length - 1)] || null;
+            const sw   = anim ? (ec.idle?.spriteW ?? anim.spriteW) : TILE_SIZE;
+            const sh   = anim ? (ec.idle?.spriteH ?? anim.spriteH) : TILE_SIZE;
+            updateSpriteCanvas(enemySprs[i], eImg, sw, sh, e.facing);
+            enemySprs[i].spr.position.set(e.x / TILE_SIZE, 0, e.y / TILE_SIZE);
+            enemyHBs[i].position.x = e.x / TILE_SIZE;
+            enemyHBs[i].position.z = e.y / TILE_SIZE;
+        });
+
+        // Caméra orbitale autour du héros
+        const hw = hero.x / TILE_SIZE;
+        const hz = hero.y / TILE_SIZE;
+        const cosPhi = Math.cos(camPhi);
+        const cx = hw + camRadius * Math.sin(camTheta) * cosPhi;
+        const cy = camRadius * Math.sin(camPhi);
+        const cz = hz + camRadius * Math.cos(camTheta) * cosPhi;
+        camera.position.set(cx, cy, cz);
+        camera.lookAt(hw, 0.5, hz);
+
+        renderer.render(scene, camera);
     }
 
     // ── Boucle de jeu ────────────────────────────────────────────
@@ -655,39 +809,8 @@ const ENCOUNTER_COUNT = 1;
             }
         }
 
-        // Caméra centrée sur le héros, bloquée aux bords de la carte
-        camX = Math.max(0, Math.min(hero.x - vpW / 2, MAP_W - vpW));
-        camY = Math.max(0, Math.min(hero.y - vpH / 2, MAP_H - vpH));
-
-        // Reset transform pour effacer le canvas physique entier
-        ctx.setTransform(1, 0, 0, 1, 0, 0);
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-        // Applique zoom + décalage caméra en une seule transformation
-        ctx.setTransform(scale, 0, 0, scale, -camX * scale, -camY * scale);
-        drawGrid();
-        drawEnemies(dt);
-        drawTarget();
-        drawHero(dt);
+        render3D(dt);
         requestAnimationFrame(loop);
-    }
-
-    // ── Indicateur de cible souris ───────────────────────────────
-    function drawTarget() {
-        if (!hero.target) return;
-        const x = hero.target.x;
-        const y = hero.target.y;
-        ctx.save();
-        ctx.strokeStyle = "rgba(201,168,76,0.8)";
-        ctx.lineWidth   = 1;
-        const r = TILE_SIZE * 0.3;
-        ctx.beginPath(); ctx.moveTo(x - r, y); ctx.lineTo(x + r, y); ctx.stroke();
-        ctx.beginPath(); ctx.moveTo(x, y - r); ctx.lineTo(x, y + r); ctx.stroke();
-        ctx.beginPath();
-        ctx.arc(x, y, r * 0.5, 0, Math.PI * 2);
-        ctx.strokeStyle = "rgba(201,168,76,0.5)";
-        ctx.stroke();
-        ctx.restore();
     }
 
     // ── Saisie clavier ───────────────────────────────────────────
@@ -699,18 +822,28 @@ const ENCOUNTER_COUNT = 1;
             if (chest) ITEM_GRID[chest.row][chest.col] = 2;
         }
     });
-    document.addEventListener("keyup",   e => keys.delete(e.key));
+    document.addEventListener("keyup", e => keys.delete(e.key));
 
-    // ── Clic souris → déplacement ou ouverture de coffre ────────────────────────
+    // ── Clic souris → déplacement ou ouverture de coffre ────────
+    const rayClick = new THREE.Raycaster();
+    const mouseNDC = new THREE.Vector2();
+    const groundPl = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+    const hitPt    = new THREE.Vector3();
+
     canvas.addEventListener("click", e => {
         const rect = canvas.getBoundingClientRect();
-        const wx = (e.clientX - rect.left) / scale + camX;
-        const wy = (e.clientY - rect.top)  / scale + camY;
-        const tc = Math.floor(wx / TILE_SIZE);
-        const tr = Math.floor(wy / TILE_SIZE);
+        mouseNDC.x =  ((e.clientX - rect.left) / rect.width)  * 2 - 1;
+        mouseNDC.y = -((e.clientY - rect.top)  / rect.height) * 2 + 1;
+        rayClick.setFromCamera(mouseNDC, camera);
+        if (!rayClick.ray.intersectPlane(groundPl, hitPt)) return;
+
+        // Coordonnées monde → coordonnées pixel (logique de jeu)
+        const wx = hitPt.x * TILE_SIZE;
+        const wy = hitPt.z * TILE_SIZE;
+        const tc = Math.floor(hitPt.x);
+        const tr = Math.floor(hitPt.z);
 
         if (ITEM_GRID[tr]?.[tc] === 1) {
-            // Clic sur un coffre fermé : ouvre si le héros le touche, sinon s'en approche
             const contact = chestInContact();
             if (contact && contact.row === tr && contact.col === tc) {
                 ITEM_GRID[tr][tc] = 2;
@@ -721,6 +854,31 @@ const ENCOUNTER_COUNT = 1;
             hero.target = { x: wx, y: wy };
         }
     });
+
+    // ── Contrôles caméra orbitale ────────────────────────────────
+    canvas.addEventListener("contextmenu", e => e.preventDefault());
+
+    canvas.addEventListener("mousedown", e => {
+        if (e.button === 2) {
+            orbitDragging = true;
+            orbitLastX = e.clientX;
+            orbitLastY = e.clientY;
+        }
+    });
+    window.addEventListener("mouseup", e => { if (e.button === 2) orbitDragging = false; });
+    window.addEventListener("mousemove", e => {
+        if (!orbitDragging) return;
+        const dx = e.clientX - orbitLastX;
+        const dy = e.clientY - orbitLastY;
+        orbitLastX = e.clientX;
+        orbitLastY = e.clientY;
+        camTheta -= dx * 0.005;
+        camPhi = Math.max(CAM_PHI_MIN, Math.min(CAM_PHI_MAX, camPhi + dy * 0.005));
+    });
+    canvas.addEventListener("wheel", e => {
+        e.preventDefault();
+        camRadius = Math.max(CAM_R_MIN, Math.min(CAM_R_MAX, camRadius + e.deltaY * 0.015));
+    }, { passive: false });
 
     loadHeroSprites();
     loadEnemySprites();
